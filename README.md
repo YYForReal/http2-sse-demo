@@ -8,6 +8,8 @@
 基于FastAPI和Hypercorn实现的HTTP/2服务器推送演示项目，展示了如何利用HTTP/2的服务器推送特性提升Web应用性能。
 
 
+
+
 ## 项目特点
 
 - 🚀 **HTTP/2服务器推送**：预加载CSS和JavaScript资源，减少页面加载时间
@@ -70,7 +72,7 @@ pip install fastapi hypercorn cryptography
 openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
 ```
 
-or **windows可用**
+or **Windows环境可用**
 
 ```bash
 python generate_cert.py

@@ -3,8 +3,97 @@
 <head>
     <title>Fetch API with HTTP/2</title>
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .demo-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .stream-container {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background-color: white;
+        }
+        .stream-item {
+            padding: 5px;
+            margin-bottom: 5px;
+            border-left: 3px solid #0066cc;
+            background-color: #f0f8ff;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .controls button {
+            padding: 8px 16px;
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .controls button:hover {
+            background-color: #0055aa;
+        }
+        .controls button.stop {
+            background-color: #cc0000;
+        }
+        .controls button.stop:hover {
+            background-color: #aa0000;
+        }
+        .status {
+            font-style: italic;
+            color: #666;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>HTTP/2 + Fetch API 示例</h1>
+        
+        <!-- 传统Fetch请求示例 -->
+        <div class="card">
+            <h2>基本Fetch请求</h2>
+            <p>这个示例展示了如何使用Fetch API在HTTP/2环境中获取数据。</p>
+            <button onclick="fetchData()">获取数据</button>
+            <p id="status">点击按钮获取数据...</p>
+            <pre id="result"></pre>
+        </div>
+        
+        <!-- Fetch实现SSE示例 -->
+        <div class="card">
+            <h2>使用Fetch API实现SSE推送</h2>
+            <p>这个示例展示了如何使用Fetch API代替传统EventSource实现服务器发送事件(SSE)。</p>
+            <p>相比传统EventSource，使用Fetch API实现SSE具有以下优势：</p>
+            <ul>
+                <li>更灵活的请求控制（可添加自定义头部、凭证等）</li>
+                <li>可以使用AbortController中断连接</li>
+                <li>与其他Fetch请求共享HTTP/2连接复用优势</li>
+            </ul>
+            
+            <div class="demo-container">
+                <div class="controls">
+                    <button onclick="startFetchSSE()">开始接收事件流</button>
+                    <button onclick="stopFetchSSE()" class="stop">停止接收</button>
+                </div>
+                <p class="status" id="sse-status">点击"开始接收事件流"按钮开始接收服务器推送的事件...</p>
+                <div class="stream-container" id="stream-container"></div>
+            </div>
+        </div>
+        
+        <p><a href="/">返回首页</a> | <a href="/fetch-sse-chatbot">查看聊天机器人示例</a></p>
+    </div>
+
     <script>
-        // 使用Fetch API获取数据
+        // 基本Fetch请求示例
         async function fetchData() {
             try {
                 const response = await fetch('/api/data');
@@ -15,18 +104,96 @@
                 document.getElementById('status').textContent = `错误: ${error.message}`;
             }
         }
+        
+        // Fetch实现SSE的全局变量
+        let controller = null;
+        const streamContainer = document.getElementById('stream-container');
+        const sseStatus = document.getElementById('sse-status');
+        
+        // 添加事件到容器
+        function addStreamItem(text) {
+            const item = document.createElement('div');
+            item.className = 'stream-item';
+            item.textContent = text;
+            streamContainer.appendChild(item);
+            streamContainer.scrollTop = streamContainer.scrollHeight;
+        }
+        
+        // 使用Fetch API实现SSE
+        async function startFetchSSE() {
+            // 如果已经有连接，先停止
+            if (controller) {
+                stopFetchSSE();
+            }
+            
+            try {
+                // 创建AbortController用于控制请求
+                controller = new AbortController();
+                const signal = controller.signal;
+                
+                sseStatus.textContent = '正在连接服务器事件流...';
+                
+                // 发起fetch请求获取事件流
+                const response = await fetch('/api/events', {
+                    signal,
+                    headers: {
+                        'Accept': 'text/event-stream'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+                
+                sseStatus.textContent = '连接成功，正在接收事件...';
+                
+                // 获取响应体的可读流
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                // 处理数据流
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    // 解码并添加到缓冲区
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    // 处理SSE格式的消息（以\n\n分隔）
+                    const messages = buffer.split('\n\n');
+                    buffer = messages.pop(); // 保留最后一个可能不完整的消息
+                    
+                    for (const message of messages) {
+                        if (message.startsWith('data: ')) {
+                            const data = message.substring(6); // 去掉'data: '
+                            addStreamItem(data);
+                        }
+                    }
+                }
+                
+                sseStatus.textContent = '事件流已结束';
+                controller = null;
+                
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    sseStatus.textContent = '已停止接收事件';
+                } else {
+                    sseStatus.textContent = `错误: ${error.message}`;
+                    console.error('SSE连接错误:', error);
+                }
+                controller = null;
+            }
+        }
+        
+        // 停止SSE连接
+        function stopFetchSSE() {
+            if (controller) {
+                controller.abort();
+                controller = null;
+                sseStatus.textContent = '已手动停止接收事件';
+            }
+        }
     </script>
-</head>
-<body>
-    <div class="container">
-        <h1>HTTP/2 + Fetch API 示例</h1>
-        <div class="card">
-            <p>这个示例展示了如何使用Fetch API在HTTP/2环境中获取数据。</p>
-            <button onclick="fetchData()">获取数据</button>
-            <p id="status">点击按钮获取数据...</p>
-            <pre id="result"></pre>
-        </div>
-        <p><a href="/">返回首页</a></p>
-    </div>
 </body>
 </html>

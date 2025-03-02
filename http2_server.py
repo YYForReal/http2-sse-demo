@@ -55,6 +55,7 @@ async def index(request: Request):
                 <ul>
                     <li><a href="/fetch-demo">Fetch API示例</a></li>
                     <li><a href="/sse-demo">EventSource (SSE)示例</a></li>
+                    <li><a href="/fetch-sse-chatbot">Fetch API SSE 聊天机器人</a></li>
                 </ul>
             </div>
         </div>
@@ -175,6 +176,40 @@ async def event_stream():
         for i in range(1, 16):
             # SSE格式: 每条消息以data:开头，以两个换行结束
             yield f"data: 消息 #{i} - 时间: {asyncio.get_event_loop().time():.2f}\n\n"
+            await asyncio.sleep(1)
+    
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+# 聊天机器人页面 - 使用Fetch API实现SSE
+@app.get("/fetch-sse-chatbot", response_class=HTMLResponse)
+async def fetch_sse_chatbot():
+    return HTMLResponse(content=open("static/fetch-sse-chatbot.html", encoding="utf-8").read())
+
+# 聊天消息处理API
+@app.post("/api/chat")
+async def chat_message(request: Request):
+    data = await request.json()
+    message = data.get("message", "")
+    # 这里只是简单地记录消息，实际应用中可能需要处理消息并生成响应
+    print(f"收到消息: {message}")
+    return {"status": "success"}
+
+# 聊天流API - 使用Fetch实现SSE
+@app.get("/api/chat-stream")
+async def chat_stream():
+    async def generate():
+        # 模拟机器人响应
+        responses = [
+            "我正在思考你的问题...",
+            "这是一个有趣的话题！",
+            "使用Fetch API实现SSE比传统的EventSource更灵活。",
+            "你可以通过AbortController来控制连接。",
+            "HTTP/2的多路复用特性使得这种实现更高效。"
+        ]
+        
+        for response in responses:
+            # SSE格式: 每条消息以data:开头，以两个换行结束
+            yield f"data: {response}\n\n"
             await asyncio.sleep(1)
     
     return StreamingResponse(generate(), media_type="text/event-stream")

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fetch API SSE Chatbot</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .chat-container {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .message {
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 18px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background-color: #0084ff;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        .bot-message {
+            background-color: #e5e5ea;
+            color: #333;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+        .message-input {
+            display: flex;
+            margin-top: 10px;
+        }
+        .message-input input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+        .message-input button {
+            padding: 8px 16px;
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .message-input button:hover {
+            background-color: #0055aa;
+        }
+        .status {
+            font-style: italic;
+            color: #666;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>HTTP/2 + Fetch API SSE 聊天机器人</h1>
+        <div class="card">
+            <p>这个示例展示了如何使用Fetch API在HTTP/2环境中实现SSE（Server-Sent Events）推送功能，创建一个简单的聊天机器人。</p>
+            <div class="chat-container" id="chatContainer"></div>
+            <p class="status" id="status">准备就绪，请发送消息...</p>
+            <div class="message-input">
+                <input type="text" id="messageInput" placeholder="输入消息..." />
+                <button onclick="sendMessage()">发送</button>
+            </div>
+        </div>
+        <p><a href="/">返回首页</a></p>
+    </div>
+
+    <script>
+        // 聊天记录容器
+        const chatContainer = document.getElementById('chatContainer');
+        const messageInput = document.getElementById('messageInput');
+        const statusElement = document.getElementById('status');
+        let controller = null;
+        
+        // 添加消息到聊天界面
+        function addMessage(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            messageDiv.textContent = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 使用Fetch API实现SSE
+        async function startSSEConnection() {
+            try {
+                // 如果已有连接，先中断
+                if (controller) {
+                    controller.abort();
+                }
+                
+                // 创建新的AbortController用于中断连接
+                controller = new AbortController();
+                const signal = controller.signal;
+                
+                statusElement.textContent = '正在连接...';
+                
+                // 使用fetch获取事件流
+                const response = await fetch('/api/chat-stream', {
+                    signal,
+                    headers: {
+                        'Accept': 'text/event-stream'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+                
+                statusElement.textContent = '连接成功，正在接收消息...';
+                
+                // 获取响应的可读流
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                // 处理数据流
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    // 解码并添加到缓冲区
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    // 处理SSE格式的消息
+                    const messages = buffer.split('\n\n');
+                    buffer = messages.pop(); // 保留最后一个可能不完整的消息
+                    
+                    for (const message of messages) {
+                        if (message.startsWith('data: ')) {
+                            const data = message.substring(6); // 去掉'data: '
+                            addMessage(data, false);
+                        }
+                    }
+                }
+                
+                statusElement.textContent = '连接已关闭';
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    statusElement.textContent = '连接已中断';
+                } else {
+                    statusElement.textContent = `错误: ${error.message}`;
+                    console.error('SSE连接错误:', error);
+                    
+                    // 5秒后尝试重连
+                    setTimeout(() => {
+                        statusElement.textContent = '尝试重新连接...';
+                        startSSEConnection();
+                    }, 5000);
+                }
+            }
+        }
+        
+        // 发送消息
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+            
+            // 显示用户消息
+            addMessage(message, true);
+            messageInput.value = '';
+            
+            try {
+                // 发送消息到服务器
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+                
+                // 如果没有活跃的SSE连接，启动一个
+                if (!controller) {
+                    startSSEConnection();
+                }
+            } catch (error) {
+                statusElement.textContent = `发送消息错误: ${error.message}`;
+                console.error('发送消息错误:', error);
+            }
+        }
+        
+        // 监听Enter键发送消息
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // 页面加载时添加欢迎消息
+        document.addEventListener('DOMContentLoaded', () => {
+            addMessage('你好！我是一个使用Fetch API实现SSE的聊天机器人。请发送消息给我！', false);
+        });
+    </script>
+</body>
+</html>
