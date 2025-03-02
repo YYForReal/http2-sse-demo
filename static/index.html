@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HTTP/2 Server Push Demo</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/app.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>HTTP/2 服务器推送演示</h1>
+        <div class="card">
+            <p>这个页面使用HTTP/2服务器推送技术预加载了CSS和JavaScript资源。</p>
+            <p>打开开发者工具的Network标签查看推送资源。</p>
+            <p id="load-time"></p>
+        </div>
+        <div class="card">
+            <h2>测试链接</h2>
+            <ul>
+                <li><a href="/fetch-demo">Fetch API示例</a></li>
+                <li><a href="/sse-demo">EventSource (SSE)示例</a></li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

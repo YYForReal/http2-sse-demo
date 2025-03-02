@@ -1,0 +1,4 @@
+body { font-family: Arial; color: #333; background-color: #f5f5f5; }
+.container { max-width: 800px; margin: 0 auto; padding: 20px; }
+h1 { color: #0066cc; }
+.card { background: white; border-radius: 8px; padding: 15px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }

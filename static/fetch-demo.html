@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fetch API with HTTP/2</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        // 使用Fetch API获取数据
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('status').textContent = '数据获取成功！';
+            } catch (error) {
+                document.getElementById('status').textContent = `错误: ${error.message}`;
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>HTTP/2 + Fetch API 示例</h1>
+        <div class="card">
+            <p>这个示例展示了如何使用Fetch API在HTTP/2环境中获取数据。</p>
+            <button onclick="fetchData()">获取数据</button>
+            <p id="status">点击按钮获取数据...</p>
+            <pre id="result"></pre>
+        </div>
+        <p><a href="/">返回首页</a></p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EventSource with HTTP/2</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const eventSource = new EventSource('/api/events');
+            const messagesList = document.getElementById('messages');
+            
+            eventSource.onmessage = function(event) {
+                const newItem = document.createElement('li');
+                newItem.textContent = event.data;
+                messagesList.appendChild(newItem);
+            };
+            
+            eventSource.onerror = function() {
+                const errorItem = document.createElement('li');
+                errorItem.textContent = '连接错误，尝试重新连接...';
+                errorItem.style.color = 'red';
+                messagesList.appendChild(errorItem);
+            };
+            
+            // 15秒后关闭连接
+            setTimeout(() => {
+                eventSource.close();
+                const closeItem = document.createElement('li');
+                closeItem.textContent = '连接已关闭';
+                closeItem.style.fontWeight = 'bold';
+                messagesList.appendChild(closeItem);
+            }, 15000);
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>HTTP/2 + EventSource (SSE) 示例</h1>
+        <div class="card">
+            <p>这个示例展示了如何使用EventSource (SSE)在HTTP/2环境中接收服务器发送的事件。</p>
+            <p>服务器将每秒发送一条消息，共发送15条：</p>
+            <ul id="messages"></ul>
+        </div>
+        <p><a href="/">返回首页</a></p>
+    </div>
+</body>
+</html>
